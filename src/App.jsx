@@ -315,32 +315,64 @@ function Panel({ title, className, actions, children }) {
   );
 }
 
-function CodeBlock({ language, value, maxHeight = 130 }) {
+function CodeBlock({ language, value, maxHeight = 110, compact = false }) {
+  const padding = compact ? "8px" : "10px";
+  const fontSize = compact ? "0.74rem" : "0.78rem";
+  const maxHeightValue = maxHeight ?? 110;
   return (
-    <SyntaxHighlighter
-      language={language}
-      style={oneDark}
-      customStyle={{
-        margin: 0,
-        padding: "12px",
-        borderRadius: "12px",
-        background: "#0f1f24",
-        fontSize: "0.78rem",
-        lineHeight: 1.4,
-        maxHeight,
-        overflow: "auto",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word"
-      }}
-      codeTagProps={{
-        style: {
-          fontFamily:
-            "\"SFMono-Regular\", \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace"
-        }
-      }}
-    >
-      {value || "—"}
-    </SyntaxHighlighter>
+    <div className="code-block-wrap">
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        wrapLongLines
+        customStyle={{
+          margin: 0,
+          padding,
+          borderRadius: "12px",
+          background: "#0f1f24",
+          fontSize,
+          lineHeight: 1.35,
+          maxHeight: maxHeightValue,
+          overflowX: "hidden",
+          overflowY: "auto",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          boxSizing: "border-box",
+          width: "100%",
+          maxWidth: "100%"
+        }}
+        codeTagProps={{
+          style: {
+            fontFamily:
+              "\"SFMono-Regular\", \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere"
+          }
+        }}
+      >
+        {value || "—"}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
+function CodeModal({ title, language, value, onClose }) {
+  if (!value) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <span>{title}</span>
+          <button type="button" className="modal-close" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="modal-body">
+          <CodeBlock language={language} value={value} maxHeight="70vh" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -386,6 +418,7 @@ export default function App() {
   const [clickedPoint, setClickedPoint] = useState(null);
   const [timeseriesVisible, setTimeseriesVisible] = useState(false);
   const [timeseriesChartMode, setTimeseriesChartMode] = useState("line");
+  const [codeModal, setCodeModal] = useState(null);
   const endpointConfig = endpointConfigs[endpointKey];
   const variableOptions = datasetVariables[form.dataset] ?? datasetVariables.RAP_PRODUCTION;
   const temporalStatisticValue =
@@ -604,6 +637,15 @@ export default function App() {
         error: error.message || "Failed to load timeseries data."
       }));
     }
+  };
+
+  const openCodeModal = ({ title, value, language = "text" }) => {
+    if (!value) return;
+    setCodeModal({ title, value, language });
+  };
+
+  const closeCodeModal = () => {
+    setCodeModal(null);
   };
 
   const handleTimeseriesAllVariables = async () => {
@@ -872,6 +914,10 @@ export default function App() {
     datasetVariableList.every((value) => requestVariables.includes(value));
   const canToggleChart = isAllVariablesRequest;
   const chartType = timeseriesChartMode === "stacked" ? "column" : "line";
+  const mapResponseObject = formatJson(mapResponse.body);
+  const mapResponseDisplay = mapResponseObject || "—";
+  const timeseriesResponseObject = timeseriesState.responseText || "";
+  const timeseriesResponseDisplay = timeseriesResponseObject || "—";
 
   const timeseriesCurl = useMemo(() => {
     const baseUrl = API_BASE ? joinUrl(API_BASE, TIMESERIES_ENDPOINT) : "<API_BASE><ENDPOINT>";
@@ -912,8 +958,8 @@ export default function App() {
         <div className="brand">
           <img src="/climate-engine-logo.png" alt="Climate Engine" />
           <div>
-            <p className="brand-label">Climate Engine API Demo</p>
-            <span className="brand-subtitle">Interactive map + request builder</span>
+            <p className="brand-label">Climate Engine FVC API Demo</p>
+            <span className="brand-subtitle">Map and Timeseries Explorer using RAP and RCMAP</span>
           </div>
         </div>
         <div className="header-meta">
@@ -1116,19 +1162,40 @@ export default function App() {
             <div className="code-blocks">
               <div>
                 <p className="code-label">Request snippet</p>
-                <CodeBlock language="javascript" value={requestSnippet} maxHeight={110} />
+                <CodeBlock language="javascript" value={requestSnippet} maxHeight={90} />
               </div>
               <div>
                 <p className="code-label">cURL</p>
-                <CodeBlock language="bash" value={curlCommand} maxHeight={110} />
+                <CodeBlock language="bash" value={curlCommand} maxHeight={90} />
                 <p className="code-label">Returned status</p>
                 <CodeBlock
                   language="text"
                   value={mapResponse.status ? String(mapResponse.status) : "—"}
-                  maxHeight={60}
+                  maxHeight={40}
+                  compact
                 />
-                <p className="code-label">Returned object</p>
-                <CodeBlock language="json" value={formatJson(mapResponse.body)} maxHeight={120} />
+                <div className="code-label-row">
+                  <p className="code-label">Returned object</p>
+                  <button
+                    type="button"
+                    className="code-expand"
+                    onClick={() =>
+                      openCodeModal({
+                        title: "Returned object",
+                        language: "json",
+                        value: mapResponseObject
+                      })
+                    }
+                    disabled={!mapResponseObject}
+                  >
+                    Expand
+                  </button>
+                </div>
+                <CodeBlock
+                  language="json"
+                  value={mapResponseDisplay}
+                  maxHeight={90}
+                />
               </div>
             </div>
           ) : (
@@ -1289,22 +1356,39 @@ export default function App() {
                 <div className="ts-code">
                   <div>
                     <p className="code-label">Request snippet</p>
-                    <CodeBlock language="javascript" value={timeseriesSnippet} maxHeight={110} />
+                    <CodeBlock language="javascript" value={timeseriesSnippet} maxHeight={90} />
                   </div>
                   <div>
                     <p className="code-label">cURL</p>
-                    <CodeBlock language="bash" value={timeseriesCurl} maxHeight={110} />
+                    <CodeBlock language="bash" value={timeseriesCurl} maxHeight={90} />
                     <p className="code-label">Returned status</p>
                     <CodeBlock
                       language="text"
                       value={timeseriesState.status ? String(timeseriesState.status) : "—"}
-                      maxHeight={60}
+                      maxHeight={40}
+                      compact
                     />
-                    <p className="code-label">Returned object</p>
+                    <div className="code-label-row">
+                      <p className="code-label">Returned object</p>
+                      <button
+                        type="button"
+                        className="code-expand"
+                        onClick={() =>
+                          openCodeModal({
+                            title: "Returned object",
+                            language: "text",
+                            value: timeseriesResponseObject
+                          })
+                        }
+                        disabled={!timeseriesResponseObject}
+                      >
+                        Expand
+                      </button>
+                    </div>
                     <CodeBlock
                       language="text"
-                      value={timeseriesState.responseText || "—"}
-                      maxHeight={120}
+                      value={timeseriesResponseDisplay}
+                      maxHeight={90}
                     />
                   </div>
                 </div>
@@ -1315,6 +1399,12 @@ export default function App() {
           </Panel>
         ) : null}
       </main>
+      <CodeModal
+        title={codeModal?.title}
+        language={codeModal?.language}
+        value={codeModal?.value}
+        onClose={closeCodeModal}
+      />
     </div>
   );
 }
