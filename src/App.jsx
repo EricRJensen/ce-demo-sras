@@ -19,7 +19,7 @@ const joinUrl = (base, endpoint) => {
   return `${base.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 };
 
-const API_BASE = sanitizeEnv(import.meta.env.VITE_CE_API_BASE);
+const API_BASE = "https://api-dev.climateengine.org";
 const API_TOKEN = sanitizeEnv(import.meta.env.VITE_CE_TOKEN);
 const AUTH_HEADER = sanitizeEnv(import.meta.env.VITE_CE_AUTH_HEADER) || "Authorization";
 const AUTH_SCHEME = sanitizeEnv(import.meta.env.VITE_CE_AUTH_SCHEME);
@@ -51,8 +51,7 @@ const endpointConfigs = {
     path: "/raster/mapid/anomalies",
     usesTargetDates: true,
     usesClimatologyYears: true,
-    temporalStatistic: "mean",
-    calculation: "anompercentof"
+    temporalStatistic: "mean"
   },
   mann_kendall: {
     label: "Mann-Kendall",
@@ -202,8 +201,8 @@ const datasetVariables = {
     { value: "rangeland_litter", label: "Litter Cover" },
     { value: "rangeland_sagebrush", label: "Sagebrush Cover" },
     { value: "rangeland_shrub", label: "Shrub Cover" },
-    { value: "rangeland_shrub_height", label: "Shrub Height" },
-    { value: "rangeland_perennial_herbacous", label: "Perennial Herbaceous Cover" },
+    // { value: "rangeland_shrub_height", label: "Shrub Height" },
+    // { value: "rangeland_perennial_herbacous", label: "Perennial Herbaceous Cover" },
     { value: "rangeland_tree", label: "Tree Cover" }
   ]
 };
@@ -213,11 +212,19 @@ const statisticOptions = [
 ];
 
 const pValueOptions = ["1.0", "0.5", "0.2", "0.1", "0.05", "0.01"];
+const anomaliesCalculationOptions = [
+  { value: "anom", label: "anom" },
+  { value: "anompercentof", label: "anompercentof" },
+  { value: "anompercentchange", label: "anompercentchange" }
+];
+const getDefaultAnomaliesCalculation = (dataset) =>
+  dataset === "RAP_PRODUCTION" ? "anompercentof" : "anom";
 
 const minYear = 1986;
 const maxYear = 2025;
 const mkDefaultStartYear = 1996;
 const mkDefaultEndYear = 2025;
+const valuesDefaultStartYear = Math.max(maxYear - 1, minYear);
 const yearOptions = Array.from(
   { length: maxYear - minYear + 1 },
   (_, index) => minYear + index
@@ -245,8 +252,8 @@ const variableColors = {
   rangeland_litter: "#7a5e3a",
   rangeland_sagebrush: "#7f6b3e",
   rangeland_shrub: "#8b5a3c",
-  rangeland_shrub_height: "#5b7fa6",
-  rangeland_perennial_herbacous: "#2c8f6f",
+  // rangeland_shrub_height: "#5b7fa6",
+  // rangeland_perennial_herbacous: "#2c8f6f",
   rangeland_tree: "#2a7f4f"
 };
 
@@ -273,12 +280,15 @@ const formatLegendValue = (value) => {
   return value ?? "";
 };
 
-const resolveLegendEntry = (dataset, variable, endpointKey) => {
+const resolveLegendEntry = (dataset, variable, endpointKey, calculationOverride) => {
   const datasetLegend = legendDefaults[dataset];
   if (!datasetLegend) return null;
   const variableLegend = datasetLegend[variable];
   if (!variableLegend) return null;
-  let calculationKey = endpointLegendKey[endpointKey] || "value";
+  let calculationKey =
+    (calculationOverride === "percentile" ? "percentiles" : calculationOverride) ||
+    endpointLegendKey[endpointKey] ||
+    "value";
   let entry = variableLegend[calculationKey];
   if (!entry && calculationKey === "anompercentof") {
     calculationKey = "anom";
@@ -392,7 +402,8 @@ export default function App() {
     dataset: "RAP_PRODUCTION",
     variable: "herbaceousAGB",
     temporal_statistic: "mean",
-    startYear: Math.max(maxYear - 1, minYear),
+    anomaliesCalculation: getDefaultAnomaliesCalculation("RAP_PRODUCTION"),
+    startYear: valuesDefaultStartYear,
     endYear: maxYear,
     climatologyStartYear: 1996,
     climatologyEndYear: 2025,
@@ -401,6 +412,7 @@ export default function App() {
   const [submittedParams, setSubmittedParams] = useState(null);
   const [showCode, setShowCode] = useState(false);
   const [tileUrl, setTileUrl] = useState("");
+  const [layerVisible, setLayerVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [mapResponse, setMapResponse] = useState({ status: null, body: "" });
@@ -445,7 +457,7 @@ export default function App() {
       }
 
       if (endpointKey === "anomalies") {
-        nextParams.calculation = endpointConfig.calculation;
+        nextParams.calculation = form.anomaliesCalculation;
         nextParams.start_year = form.climatologyStartYear;
         nextParams.end_year = form.climatologyEndYear;
       }
@@ -456,7 +468,6 @@ export default function App() {
         nextParams.end_season = endpointConfig.endSeason;
         nextParams.start_year = form.startYear;
         nextParams.end_year = form.endYear;
-        // API expects p_value as a string even when optional.
         nextParams.p_value = form.pValue || "0.5";
       }
 
@@ -465,7 +476,7 @@ export default function App() {
         nextParams.percentile_step = endpointConfig.percentileStep;
         nextParams.start_year = form.climatologyStartYear;
         nextParams.end_year = form.climatologyEndYear;
-        // Workaround for API validation expecting p_value as string.
+        nextParams.precision = "1e-07";
         nextParams.p_value = "0.5";
       }
 
@@ -517,7 +528,8 @@ export default function App() {
         return {
           ...prev,
           dataset: nextDataset,
-          variable: fallbackVariable
+          variable: fallbackVariable,
+          anomaliesCalculation: getDefaultAnomaliesCalculation(nextDataset)
         };
       }
       return {
@@ -535,6 +547,27 @@ export default function App() {
         startYear: mkDefaultStartYear,
         endYear: mkDefaultEndYear
       }));
+      return;
+    }
+    if (key === "anomalies" || key === "percentiles") {
+      setForm((prev) => ({
+        ...prev,
+        startYear: maxYear,
+        endYear: maxYear
+      }));
+      return;
+    }
+    if (key === "values") {
+      setForm((prev) => {
+        if (prev.startYear === maxYear && prev.endYear === maxYear) {
+          return {
+            ...prev,
+            startYear: valuesDefaultStartYear,
+            endYear: maxYear
+          };
+        }
+        return prev;
+      });
     }
   };
 
@@ -547,7 +580,7 @@ export default function App() {
     if (!API_BASE) {
       setTimeseriesState((prev) => ({
         ...prev,
-        error: "Set VITE_CE_API_BASE in .env to enable timeseries requests."
+        error: "API base URL is not configured."
       }));
       return;
     }
@@ -668,7 +701,7 @@ export default function App() {
     if (!API_BASE) {
       setTimeseriesState((prev) => ({
         ...prev,
-        error: "Set VITE_CE_API_BASE in .env to enable timeseries requests."
+        error: "API base URL is not configured."
       }));
       return;
     }
@@ -764,6 +797,7 @@ export default function App() {
     setShowCode(true);
     setSubmittedParams(params);
     setSubmittedEndpointKey(endpointKey);
+    setLayerVisible(true);
     setStatusMessage("");
     setTileUrl("");
     setMapResponse({ status: null, body: "" });
@@ -787,7 +821,7 @@ export default function App() {
     }
 
     if (!API_BASE) {
-      setStatusMessage("Set VITE_CE_API_BASE in .env to enable map tiles.");
+      setStatusMessage("API base URL is not configured.");
       return;
     }
 
@@ -871,8 +905,15 @@ export default function App() {
   const legendEndpointKeyValue = submittedParams ? submittedEndpointKey : endpointKey;
   const legendDataset = submittedParams?.dataset;
   const legendVariable = submittedParams?.variable;
+  const legendCalculationOverride =
+    legendEndpointKeyValue === "anomalies" ? submittedParams?.calculation : null;
   const legendResult = submittedParams
-    ? resolveLegendEntry(legendDataset, legendVariable, legendEndpointKeyValue)
+    ? resolveLegendEntry(
+        legendDataset,
+        legendVariable,
+        legendEndpointKeyValue,
+        legendCalculationOverride
+      )
     : null;
   const legendEntry = legendResult?.entry;
   const legendPalette = legendEntry?.palette ?? [];
@@ -880,6 +921,8 @@ export default function App() {
     ? `linear-gradient(90deg, ${legendPalette.join(",")})`
     : "";
   const legendCalculationLabel = submittedParams?.calculation ?? legendResult?.calculationKey;
+  const hasLayer = Boolean(submittedParams);
+  const layerChecked = hasLayer && layerVisible;
 
   const activeDataset = submittedParams?.dataset ?? form.dataset;
   const activeVariable = submittedParams?.variable ?? form.variable;
@@ -980,9 +1023,9 @@ export default function App() {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             attribution="&copy; OpenStreetMap contributors &copy; CARTO"
           />
-          {tileUrl ? (
+          {tileUrl && layerChecked ? (
             <TileLayer url={tileUrl} opacity={0.7} />
-          ) : submittedParams ? (
+          ) : submittedParams && layerChecked ? (
             <Rectangle
               bounds={placeholderBounds}
               pathOptions={{
@@ -1049,7 +1092,22 @@ export default function App() {
               </select>
             </label>
 
-            {endpointConfig.calculation ? (
+            {endpointKey === "anomalies" ? (
+              <label className="form-field">
+                <span>Calculation</span>
+                <select
+                  name="anomaliesCalculation"
+                  value={form.anomaliesCalculation}
+                  onChange={handleChange}
+                >
+                  {anomaliesCalculationOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : endpointConfig.calculation ? (
               <label className="form-field">
                 <span>Calculation</span>
                 <input type="text" value={endpointConfig.calculation} readOnly />
@@ -1204,6 +1262,18 @@ export default function App() {
         </Panel>
 
         <Panel title="Legend" className="legend-panel">
+          {hasLayer ? (
+            <div className="legend-toggle">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={layerChecked}
+                  onChange={(event) => setLayerVisible(event.target.checked)}
+                />
+                <span>Show layer</span>
+              </label>
+            </div>
+          ) : null}
           {legendEntry ? (
             <div className="legend-content">
               <div className="legend-details">

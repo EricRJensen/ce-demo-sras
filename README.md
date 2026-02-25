@@ -46,7 +46,6 @@ npm install
 Create or update `.env`:
 
 ```
-VITE_CE_API_BASE=https://api-dev.climateengine.org
 VITE_CE_TOKEN=YOUR_TOKEN
 VITE_CE_AUTH_HEADER=Authorization
 VITE_CE_AUTH_SCHEME=none
@@ -54,7 +53,7 @@ VITE_CE_AUTH_SCHEME=none
 
 Notes:
 - `VITE_CE_AUTH_SCHEME=none` sends the raw token (no `Bearer` prefix). If your token requires `Bearer`, set it to `Bearer`.
-- The app chooses the specific endpoint based on the UI selection. Only `VITE_CE_API_BASE` is required.
+- The API base URL is hardcoded in `src/App.jsx`. Update it there if you need to target a different API host.
 
 ### Run
 
