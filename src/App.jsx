@@ -211,7 +211,7 @@ const statisticOptions = [
   { value: "mean", label: "Mean" }
 ];
 
-const pValueOptions = ["1.0", "0.2", "0.1", "0.05", "0.01"];
+const pValueOptions = ["1.0", "0.5", "0.2", "0.1", "0.05", "0.01"];
 const anomaliesCalculationOptions = [
   { value: "anom", label: "anom" },
   { value: "anompercentof", label: "anompercentof" },
@@ -396,7 +396,6 @@ function MapClickHandler({ onClick }) {
 }
 
 export default function App() {
-  const logoUrl = `${import.meta.env.BASE_URL}climate-engine-logo.png`;
   const [endpointKey, setEndpointKey] = useState("values");
   const [submittedEndpointKey, setSubmittedEndpointKey] = useState("values");
   const [form, setForm] = useState({
@@ -1000,7 +999,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="brand">
-          <img src={logoUrl} alt="Climate Engine" />
+          <img src="/climate-engine-logo.png" alt="Climate Engine" />
           <div>
             <p className="brand-label">Climate Engine FVC API Demo</p>
             <span className="brand-subtitle">Map and Timeseries Explorer using RAP and RCMAP</span>
