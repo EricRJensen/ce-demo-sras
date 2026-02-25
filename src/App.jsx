@@ -211,7 +211,7 @@ const statisticOptions = [
   { value: "mean", label: "Mean" }
 ];
 
-const pValueOptions = ["1.0", "0.5", "0.2", "0.1", "0.05", "0.01"];
+const pValueOptions = ["1.0", "0.2", "0.1", "0.05", "0.01"];
 const anomaliesCalculationOptions = [
   { value: "anom", label: "anom" },
   { value: "anompercentof", label: "anompercentof" },
