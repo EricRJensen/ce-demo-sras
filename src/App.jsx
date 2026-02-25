@@ -19,7 +19,7 @@ const joinUrl = (base, endpoint) => {
   return `${base.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 };
 
-const API_BASE = "https://api-dev.climateengine.org";
+const API_BASE = "https://api.climateengine.org";
 const API_TOKEN = sanitizeEnv(import.meta.env.VITE_CE_TOKEN);
 const AUTH_HEADER = sanitizeEnv(import.meta.env.VITE_CE_AUTH_HEADER) || "Authorization";
 const AUTH_SCHEME = sanitizeEnv(import.meta.env.VITE_CE_AUTH_SCHEME);
