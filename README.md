@@ -92,4 +92,4 @@ Then open `http://localhost:5173`.
 
 ## License
 
-Internal demo application. No public license specified.
+Internal application. No public license specified.
